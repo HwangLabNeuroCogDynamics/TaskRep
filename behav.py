@@ -1,5 +1,5 @@
 ####################################################################
-# Script to do basic stats and clustering analysis on behavior data.
+# Script to do basic stats and regression on behavior data.
 ####################################################################
 
 import pandas as pd
@@ -18,8 +18,10 @@ import scipy.cluster.hierarchy as sch
 included_subjects = ['128', '112', '108', '110', '120', '98', '86', '82', '115', '94', '76', '91', '80', '95', '121', '114', '125', '70',
 '107', '111', '88', '113', '131', '130', '135', '140', '167', '145', '146', '138', '147', '176', '122', '118', '103', '142']
 classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
+
+#these are paths for Argon cluster at UIowa, so specific to where we stored our data.
 data_path = '/Shared/lss_kahwang_hpc/ThalHi_data/RSA/'
-ROOT = '/Shared/lss_kahwang_hpc/ThalHi_data/'  #these are paths for Argon cluster at UIowa.
+ROOT = '/Shared/lss_kahwang_hpc/ThalHi_data/'  
 
 
 def compile_behavior():
@@ -54,7 +56,7 @@ def compile_behavior():
 
 			metadata['version'] = "Donut=Color,Filled=Shape"
 		all_df = all_df.append(metadata)
-	all_df = all_df.drop(columns=['pic_stim', 'img_path', 'index', 'cue_stim', 'trigs', 'Unnamed: 0'])
+	all_df = all_df.drop(columns=['pic_stim', 'img_path', 'index', 'cue_stim', 'trigs', 'Unnamed: 0'])  #clear book keeping vars.
 
 	return all_df
 
@@ -77,7 +79,7 @@ def rt_matrix(inputdf):
         df = inputdf.loc[inputdf['sub'] == s]
         df = df.reset_index()
 
-        #orgaznie matrix by texture, shape, color, return indx
+        #orgaznie matrix by texture, shape, color, return indx. Make sure the ordre here matches the "classes variable above"
         def get_positions(x):
             return {
                 ('Filled', 'Polygon', 'red'): 7,
@@ -95,6 +97,8 @@ def rt_matrix(inputdf):
         for i in df.index:
             if i == 0:
                 continue
+            # if df.loc[i, 'cue']== df.loc[i-1, 'cue']: #remove cue repetition effect....?
+            #     continue
             else:
                 if df.loc[i, 'trial_Corr']==1: # only correct trials
                     if df.loc[i-1, 'trial_Corr']!=0: # exclude post error slowing trials
@@ -112,7 +116,7 @@ def rt_matrix(inputdf):
         bmat = smat.copy()
         for k in np.arange(0,8):
             for j in np.arange(0,8):
-                smat[k,j] = bmat[k,j] - bmat[k,k] 
+                smat[k,j] = bmat[k,j] - bmat[j,j] 
 
         #normalize
         smat = (smat - np.nanmean(smat)) / np.nanstd(smat)
@@ -128,25 +132,72 @@ def rt_matrix(inputdf):
     mat = np.reshape(all_mat,(8,all_mat.shape[1]*all_mat.shape[2]))
     return mat, amat, all_mat
 
-swapdf = behavior_df.loc[behavior_df['swapped']==1]
-noswapdf = behavior_df.loc[behavior_df['swapped']==0]
-
-mat, amat, all_mat = rt_matrix(behavior_df)
-for s in np.arange(np.shape(all_mat)[2]):
-    sns.heatmap(all_mat[:,:,s])
-    plt.show()
-
-sns.heatmap(np.mean(all_mat, axis=2))
-plt.show()
+# swapdf = behavior_df.loc[behavior_df['swapped']==1]
+# noswapdf = behavior_df.loc[behavior_df['swapped']==0]
+# mat, amat, all_mat = rt_matrix(behavior_df)
+#mat is stacked version
+#amat is ave across subjects
+#all_mat is the full 3D matrices
+# for s in np.arange(np.shape(all_mat)[2]):
+#     sns.heatmap(all_mat[:,:,s])
+#     plt.show()
+#sns.heatmap(np.mean(all_mat, axis=2))
+#plt.show()
 
 ### create regression model
 from gen_RSA import create_RSA_models
 context_model, shape_model, color_model, identity_model, swapped_dimension_model, nonswapped_dimension_model, swapped_task_model, nonswapped_task_model, swapped_feature_model, nonswapped_feature_model = create_RSA_models()
 
+mat, amat, all_mat = rt_matrix(behavior_df)
+rt_rsa_df = pd.DataFrame()
+diag_idx = np.eye(8)==0 # to get rid of eyes in the transition matrix which are repetition effects
+for s, subject in enumerate(behavior_df['sub'].astype('int').unique()):
+    sdf = pd.DataFrame()
+    sdf['TransitionRT'] = all_mat[:,:,s][diag_idx].flatten()
+    sdf['Context'] = 1-context_model[diag_idx].flatten()
+    sdf['Identity'] = 1-identity_model[diag_idx].flatten()
+    if behavior_df.loc[behavior_df['sub']==subject]['swapped'].unique()[0]==1:
+        sdf['Feature'] = 1-swapped_dimension_model[diag_idx].flatten()
+        sdf['Task'] = 1-swapped_task_model[diag_idx].flatten()
+        sdf['Swap'] = 1
+    else:
+        sdf['Feature'] = 1-nonswapped_dimension_model[diag_idx].flatten()
+        sdf['Task'] = 1-nonswapped_task_model[diag_idx].flatten()
+        sdf['Swap'] = 0
+    sdf['Subject'] = subject
+    sdf['Steps'] = (sdf['Context'] + sdf['Feature'])
+          
+    rt_rsa_df = rt_rsa_df.append(sdf)
+
+model = "TransitionRT ~ 0 + Identity + Task"  # identity is effectively intercept
+base_model = smf.ols(formula = model, data = rt_rsa_df).fit() 
+print(base_model.summary())
+
+model = "TransitionRT ~ 0 + Identity + Task + Context + Feature"
+test_model = smf.ols(formula = model, data = rt_rsa_df).fit()  
+print(test_model.summary())
+
+model = "TransitionRT ~ 0 + Identity + Task + Feature"
+test_model2 = smf.ols(formula = model, data = rt_rsa_df).fit()  
+print(test_model2.summary())
+
+### nested model comparison
+from statsmodels.stats.anova import anova_lm
+print(sm.stats.anova_lm(base_model, test_model))
+print(sm.stats.anova_lm(base_model, test_model2))
 
 
+######################################################################
+##########Gravyard
+######################################################################
+#### data driven clustering below. 
+
+# swapdf = behavior_df.loc[behavior_df['swapped']==1]
+# noswapdf = behavior_df.loc[behavior_df['swapped']==0]
+
+# mat, amat, all_mat = rt_matrix(swapdf)
 # plt.figure()
-# sch.dendrogram(sch.linkage(mat, method  = "centroid"))
+# sch.dendrogram(sch.linkage(mat, method  = "ward"))
 # plt.title('Dendrogram')
 # plt.xlabel('condition')
 # plt.show()
