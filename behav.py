@@ -25,18 +25,16 @@ ROOT = '/Shared/lss_kahwang_hpc/ThalHi_data/'
 
 
 def compile_behavior():
-	''' conmpile dataframe for behav'''
-	
-
+	''' conmpile dataframe for behavior data'''
 	all_df = pd.DataFrame()
 	for sub in included_subjects:
 
 		metadata = pd.read_csv((ROOT+'RSA/%s_metadata.csv' %sub))
 		metadata.loc[metadata.rt=='none', 'rt'] = np.nan  #recode no responses into nans
-		metadata.loc[metadata.Subject_Respo=='none', 'Subject_Respo'] = np.nan
+		metadata.loc[metadata.Subject_Respo=='none', 'Subject_Respo'] = np.nan #recode no responses into nans
 		metadata.rt = metadata.rt.astype('float') #convert string to float
-		metadata.Subject_Respo = metadata.Subject_Respo.astype('float')
-		metadata['RT_zscore'] = (metadata.rt - np.nanmean(metadata.rt)) / np.nanstd(metadata.rt) #zcore
+		metadata.Subject_Respo = metadata.Subject_Respo.astype('float') 
+		metadata['RT_zscore'] = (metadata.rt - np.nanmean(metadata.rt)) / np.nanstd(metadata.rt) #zcore of RT, in case it is useful
 		metadata['Accuracy'] = metadata.trial_Corr
 
 		#determine swap or not swap version of context-feature mapping
@@ -60,7 +58,9 @@ def compile_behavior():
 
 	return all_df
 
-behavior_df = compile_behavior()
+#behavior_df = compile_behavior()
+#behavior_df.to_csv('Data/behavior_data.csv')
+behavior_df = pd.read_csv('Data/behavior_data.csv')
 
 print('mean')
 print(behavior_df.groupby(['sub']).mean().mean())
@@ -116,7 +116,7 @@ def rt_matrix(inputdf):
         bmat = smat.copy()
         for k in np.arange(0,8):
             for j in np.arange(0,8):
-                smat[k,j] = bmat[k,j] - bmat[j,j] 
+                smat[k,j] = bmat[k,j] - bmat[j,j] #switch trial minus repeat trial
 
         #normalize
         smat = (smat - np.nanmean(smat)) / np.nanstd(smat)
@@ -141,16 +141,20 @@ def rt_matrix(inputdf):
 # for s in np.arange(np.shape(all_mat)[2]):
 #     sns.heatmap(all_mat[:,:,s])
 #     plt.show()
-#sns.heatmap(np.mean(all_mat, axis=2))
+
+
+mat, amat, all_mat = rt_matrix(behavior_df)
+diag_idx = np.eye(8)==1 # to get rid of eyes in the transition matrix which are repetition effects
+amat[diag_idx] = np.nan 
+sns.heatmap(amat, cmap = "bwr")
+plt.savefig('Figures/behav.png')
 #plt.show()
 
 ### create regression model
 from gen_RSA import create_RSA_models
 context_model, shape_model, color_model, identity_model, swapped_dimension_model, nonswapped_dimension_model, swapped_task_model, nonswapped_task_model, swapped_feature_model, nonswapped_feature_model = create_RSA_models()
-
-mat, amat, all_mat = rt_matrix(behavior_df)
-rt_rsa_df = pd.DataFrame()
 diag_idx = np.eye(8)==0 # to get rid of eyes in the transition matrix which are repetition effects
+rt_rsa_df = pd.DataFrame()
 for s, subject in enumerate(behavior_df['sub'].astype('int').unique()):
     sdf = pd.DataFrame()
     sdf['TransitionRT'] = all_mat[:,:,s][diag_idx].flatten()
@@ -183,33 +187,9 @@ print(test_model2.summary())
 
 ### nested model comparison
 from statsmodels.stats.anova import anova_lm
-print(sm.stats.anova_lm(base_model, test_model))
-print(sm.stats.anova_lm(base_model, test_model2))
+print(anova_lm(base_model, test_model))
+print(anova_lm(base_model, test_model2))
 
-
-######################################################################
-##########Gravyard
-######################################################################
-#### data driven clustering below. 
-
-# swapdf = behavior_df.loc[behavior_df['swapped']==1]
-# noswapdf = behavior_df.loc[behavior_df['swapped']==0]
-
-# mat, amat, all_mat = rt_matrix(swapdf)
-# plt.figure()
-# sch.dendrogram(sch.linkage(mat, method  = "ward"))
-# plt.title('Dendrogram')
-# plt.xlabel('condition')
-# plt.show()
-
-# i = np.zeros(len(np.arange(2,8)))
-# sil = []
-# for ix, n in enumerate((np.arange(2,8))):
-#     k = KMeans(n_clusters=n)
-#     k.fit(mat)
-#     print(k.labels_)
-#     i[ix] = k.inertia_
-#     sil.append(silhouette_score(mat, k.labels_, metric = 'euclidean'))
 
 
 # end of script

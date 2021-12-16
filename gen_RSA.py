@@ -1,13 +1,12 @@
 ####################################################################
 # Create various representational models
 ####################################################################
-import pandas as pd
 import numpy as np
 classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
 
 def create_RSA_models():
 	'''
-	###### Create model of confusion matrices
+	###### Create models of representational similarity matrices
 	'''
 	context_model = np.zeros((8,8))
 	shape_model = np.zeros((8,8))
