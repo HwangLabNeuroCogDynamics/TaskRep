@@ -48,9 +48,9 @@ def run_trial_regression(df):
 			results_df.loc[s, 'Trial_type'] = dset.Trial_type.min()
 			results_df.loc[s, 'Trial_n'] = dset.Trial_n.min()  
 			
+			model = "probability ~ 1 + context + feature + identity + task" 
+			results = smf.ols(formula = model, data = dset).fit()
 			for param in ["context",  "feature" , "identity" , "task"]:
-				model = "probability ~ 1 + %s" %param
-				results = smf.ols(formula = model, data = dset).fit()
 				results_df.loc[s, param+'_b'] = results.params[param]
 				results_df.loc[s, param+'_t'] = results.tvalues[param]
 				results_df.loc[s, param+'_p'] = results.pvalues[param]

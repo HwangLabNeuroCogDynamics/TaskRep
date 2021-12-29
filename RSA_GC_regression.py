@@ -89,7 +89,16 @@ if __name__ == "__main__":
 	now = datetime.now()
 	print("finished time: ", now)
 
-
+	#### test correlation among regressors
+	from statsmodels.stats.outliers_influence import variance_inflation_factor
+	mat = df[['context','identity','feature','task']]
+	# VIF dataframe
+	vif_data = pd.DataFrame()
+	vif_data["regressors"] = mat.columns
+	
+	# calculating VIF for each feature
+	vif_data["regressors"] = [variance_inflation_factor(mat.values, i)
+							for i in range(len(mat.columns))]
 
 
 # end of line
