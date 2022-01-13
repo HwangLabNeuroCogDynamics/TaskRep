@@ -1,2 +1,2 @@
 # TaskRep
-Observe representational dynamics from EEG data
+Explore hierarchical representational dynamics from EEG data
