@@ -1,5 +1,5 @@
 ####################################################################
-# Script to do basic stats and regression on behavior data.
+# Script to do basic stats and regression on behavior data. Including transitional RT analysis
 ####################################################################
 
 import pandas as pd
@@ -152,7 +152,7 @@ plt.savefig('Figures/behav.png')
 
 ### create regression model
 from gen_RSA import create_RSA_models
-context_model, shape_model, color_model, identity_model, swapped_dimension_model, nonswapped_dimension_model, swapped_task_model, nonswapped_task_model, swapped_feature_model, nonswapped_feature_model = create_RSA_models()
+context_model, shape_model, color_model, identity_model, swapped_dimension_model, nonswapped_dimension_model, swapped_task_model, nonswapped_task_model, swapped_feature_model, nonswapped_feature_model, alternative_model = create_RSA_models()
 diag_idx = np.eye(8)==0 # to get rid of eyes in the transition matrix which are repetition effects
 rt_rsa_df = pd.DataFrame()
 for s, subject in enumerate(behavior_df['sub'].astype('int').unique()):
@@ -160,6 +160,7 @@ for s, subject in enumerate(behavior_df['sub'].astype('int').unique()):
     sdf['TransitionRT'] = all_mat[:,:,s][diag_idx].flatten()
     sdf['Context'] = 1-context_model[diag_idx].flatten()
     sdf['Identity'] = 1-identity_model[diag_idx].flatten()
+    sdf['alternative'] = 1-alternative_model[diag_idx].flatten()
     if behavior_df.loc[behavior_df['sub']==subject]['swapped'].unique()[0]==1:
         sdf['Feature'] = 1-swapped_dimension_model[diag_idx].flatten()
         sdf['Task'] = 1-swapped_task_model[diag_idx].flatten()
@@ -185,10 +186,23 @@ model = "TransitionRT ~ 0 + Identity + Task + Feature"
 test_model2 = smf.ols(formula = model, data = rt_rsa_df).fit()  
 print(test_model2.summary())
 
+model = "TransitionRT ~ 0 + Identity + Task + Context + Feature + alternative"
+test_model3 = smf.ols(formula = model, data = rt_rsa_df).fit()  
+print(test_model3.summary())
+
+model = "TransitionRT ~ 0 + alternative"
+test_model4 = smf.ols(formula = model, data = rt_rsa_df).fit()  
+print(test_model4.summary())
+
+model = "TransitionRT ~ 0 + Task + alternative"
+test_model4 = smf.ols(formula = model, data = rt_rsa_df).fit()  
+print(test_model4.summary())
+
 ### nested model comparison
 from statsmodels.stats.anova import anova_lm
 print(anova_lm(base_model, test_model))
 print(anova_lm(base_model, test_model2))
+print(anova_lm(test_model, test_model2))
 
 
 

@@ -18,6 +18,7 @@ def create_RSA_models():
 	nonswapped_feature_model = np.zeros((8,8))
 	swapped_task_model = np.zeros((8,8))
 	nonswapped_task_model = np.zeros((8,8))
+	alternative_model = np.zeros((8,8))
 
 	for it, target in enumerate(classes):
 		for ic, confusion in enumerate(classes):
@@ -152,7 +153,31 @@ def create_RSA_models():
 				nonswapped_task_model[it, ic] = 1
 				nonswapped_task_model[it, it] = 1
 
-	return context_model, shape_model, color_model, identity_model, swapped_dimension_model, nonswapped_dimension_model, swapped_task_model, nonswapped_task_model, swapped_feature_model, nonswapped_feature_model
+			if target=='fpr':
+				alternative_model[it, ic] = 1
+				alternative_model[it, it] = 1
+			elif ((target=='fcr') and ( (confusion == 'dcr') or (confusion == 'dpr'))):
+				alternative_model[it, ic] = 1
+				alternative_model[it, it] = 1
+			elif target=='fcb':
+				alternative_model[it, it] = 1
+			elif ((target=='fpb') and ((confusion == 'dpb') or (confusion == 'dcb'))):
+				alternative_model[it, ic] = 1
+				alternative_model[it, it] = 1
+			elif ((target=='dpr') and ((confusion == 'dcr') or (confusion == 'fcr'))):
+				alternative_model[it, ic] = 1
+				alternative_model[it, it] = 1
+			elif ((target=='dpb') and ((confusion == 'dcb') or (confusion == 'fpb'))):
+				alternative_model[it, ic] = 1
+				alternative_model[it, it] = 1
+			elif ((target=='dcr') and ((confusion == 'dpr') or (confusion == 'fcr'))):
+				alternative_model[it, ic] = 1
+				alternative_model[it, it] = 1
+			elif ((target=='dcb') and ((confusion == 'dpb') or (confusion == 'fpb'))):
+				alternative_model[it, ic] = 1
+				alternative_model[it, it] = 1
+
+	return context_model, shape_model, color_model, identity_model, swapped_dimension_model, nonswapped_dimension_model, swapped_task_model, nonswapped_task_model, swapped_feature_model, nonswapped_feature_model, alternative_model
 
 
 
