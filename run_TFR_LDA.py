@@ -1,37 +1,17 @@
 ####################################################################
 # Script to run time frequency decomp then linear discrimnation analysis
 ####################################################################
-from ThalHiEEG import *
 from sklearn.model_selection import train_test_split, ShuffleSplit, cross_val_score, cross_val_predict, KFold
 from scipy.stats import zscore
-import statsmodels.formula.api as smf
 from scipy.special import logit
-from mne.time_frequency import tfr_morlet, tfr_multitaper, tfr_stockwell
+from mne.time_frequency import tfr_morlet
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from datetime import datetime
 import numpy as np
-from numpy import average, std
-import pickle
-from numpy.random import random, randint, normal, shuffle,uniform
-import scipy
-from scipy import sparse
-from scipy.stats import ttest_ind
-from scipy.spatial.distance import pdist
-from scipy.cluster.hierarchy import dendrogram,linkage
-from scipy.stats.mstats import zscore
-import seaborn as sns
-import fnmatch
-import os  # handy system and path functions
-import sys  # to get file system encoding
-import csv
-from pandas import DataFrame, read_csv
-import matplotlib.pyplot as plt
 import pandas as pd
-import matplotlib
 import mne
-from mne.time_frequency import tfr_morlet
 
-n_jobs = 2
+n_jobs = 4
 included_subjects = input()  #wait for input to determine which subject to run
 
 classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
@@ -39,6 +19,18 @@ ROOT = '/Shared/lss_kahwang_hpc/ThalHi_data/'
 
 # included_subjects = ['128', '112', '108', '110', '120', '98', '86', '82', '115', '94', '76', '91', '80', '95', '121', '114', '125', '70',
 # '107', '111', '88', '113', '131', '130', '135', '140', '167', '145', '146', '138', '147', '176', '122', '118', '103', '142']
+
+def mirror_evoke(ep):
+
+	e = ep.copy()
+	nd = np.concatenate((np.flip(e._data[:,:,e.time_as_index(0)[0]:e.time_as_index(1.5)[0]], axis=2), e._data, np.flip(e._data[:,:,e.time_as_index(e.tmax-1.5)[0]:e.time_as_index(e.tmax)[0]],axis=2)),axis=2)
+	tnmin = e.tmin - 1.5
+	tnmax = e.tmax + 1.5
+	e._set_times(np.arange(tnmin,tnmax+e.times[2]-e.times[1],e.times[2]-e.times[1]))
+	e._data = nd
+
+	return e
+
 
 def run_TFR(sub):
 	''' run frequency decomp and save, sub by sub'''
@@ -111,7 +103,7 @@ def run_classification(x_data, y_data, tfr_data, permutation = False):
 	return n_scores
 
 
-def run_full_TFR_classification(x_data, y_data, tfr_data):
+def run_full_TFR_classification(x_data, y_data, classes):
 	''' clasification analysis with LDA, inputing one frequency at a time. Time-frequency prediction (Figure 3B)
 	Results then feed to RSA regression (Figure 4)
 	'''
@@ -119,13 +111,13 @@ def run_full_TFR_classification(x_data, y_data, tfr_data):
 	# do this 10 times then average?
 	lda = LinearDiscriminantAnalysis(solver='lsqr',shrinkage='auto')
 
-	n_scores = np.zeros((y_data.shape[0],8,10))
+	n_scores = np.zeros((y_data.shape[0],len(classes),10))
 	for n in np.arange(10):
 		cv = KFold(n_splits=4, shuffle=True, random_state=6*n)
 
 		#No need to vectorize data. Feature space is trial by ch
 		#xp_data = zscore(np.reshape(x_data, (x_data.shape[0], x_data.shape[1])))
-		scores = cross_val_predict(lda, x_data, y_data, cv=cv, method='predict_proba', pre_dispatch = n_jobs) #logit the probability
+		scores = cross_val_predict(lda, x_data, y_data, cv=cv, method='predict_proba', n_jobs = 1, pre_dispatch = 1) #logit the probability
 		n_scores[:,:,n] = scores
 
 	#logit transform prob.
@@ -135,15 +127,13 @@ def run_full_TFR_classification(x_data, y_data, tfr_data):
 	n_scores[n_scores==np.NINF]=-36.8 #float of -.9999999999xx
 
 	#calcuate accuracy
-	i=0
-	for ix, ip in enumerate(np.argmax(n_scores,axis=1)):
-		if y_data[ix] == classes[ip]:
-			i=i+1
-	print("%0.2f accuracy for timepoint %0.2f at frequency %0.2f" %(i/len(y_data)*100, tfr.times[t], tfr.freqs[f]))
+	# i=0
+	# for ix, ip in enumerate(np.argmax(n_scores,axis=1)):
+	# 	if y_data[ix] == classes[ip]:
+	# 		i=i+1
+	# print("%0.2f accuracy for timepoint %0.2f at frequency %0.2f" %(i/len(y_data)*100, tfr.times[t], tfr.freqs[f]))
 
 	return n_scores
-
-
 
 
 for sub in [included_subjects]:
@@ -159,7 +149,7 @@ for sub in [included_subjects]:
 	print(('running subject %s' %sub))
 	print('-------')
 
-	run_TFR(sub) # already did
+	#run_TFR(sub) # uncomment if need to rerun
 	tfr = mne.time_frequency.read_tfrs((ROOT+'RSA/%s_tfr.h5' %sub))[0]
 
 	#average within bands? #(1-3 Hz for the delta-band, 4-7 Hz for the theta-band, 8-12 Hz for the alphaband, 13-30 Hz for the beta-band, 31-35 Hz for the gamma-band)
@@ -172,44 +162,93 @@ for sub in [included_subjects]:
 	# tfr_data = np.zeros((tfr.data.shape[0], tfr.data.shape[1], 5, tfr.data.shape[3]))
 	# for i, band in enumerate(bands):
 	# 	tfr_data[:,:,i,:] = np.mean(tfr.data[:,:, (freqs>=band[0]) & (freqs<=band[1]), ], axis=2)
-	tfr_data = tfr.data
+	
 
 	#########################################################################################################
-	##### linear discrimination analysis
+	##### linear discrimination analysis on individual cues
 	#########################################################################################################
-	permutation = True # run permutation?
-	full_TFR = True # run full TFR prediction (each TFR bin per prediction model)
-
-	if permutation:
-		num_permutations = 10
-		trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],8,num_permutations))
-	elif not full_TFR:
-		trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],8)) #trial by time by labels (8)
-	elif full_TFR:
-		trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2], tfr_data.shape[3],8)) #trial by freq by time by labels (8)
-
-	for t in np.arange(tfr.times.shape[0]):
-		y_data = tfr.metadata.cue.values.astype('str')
-		x_data = tfr_data[:,:,:,t]
+	def run_cue_prediction(tfr, permutation = False, full_TFR=True):
+		#permutation = False # run permutation?
+		#full_TFR = True # run full TFR prediction (each TFR bin per prediction model)
+		cue_classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
+		tfr_data = tfr.data
 
 		if permutation:
-			for n_p in np.arange(num_permutations):
-				n_scores = run_classification(x_data, y_data, tfr_data, permutation = True)
-				trial_prob[:,t,:,n_p] = n_scores
+			num_permutations = 100
+			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],len(cue_classes),num_permutations))
 		elif not full_TFR:
-			n_scores = run_classification(x_data, y_data, tfr_data, permutation = False)
-			trial_prob[:,t,:] = n_scores
+			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],len(cue_classes))) #trial by time by labels (8)
 		elif full_TFR:
-			for f in np.arange(tfr_data.shape[2]):
-				x_data = tfr_data[:,:,f,t]
-				n_scores = run_full_TFR_classification(x_data, y_data, tfr_data)
-				trial_prob[:,f,t,:] = n_scores
+			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2], tfr_data.shape[3],len(cue_classes))) #trial by freq by time by labels (8)
 
-	#saving posterior prob into numpy array
-	if permutation:
-		np.save((ROOT+'/RSA/%s_prob_permutation' %sub), trial_prob)
-	else:
-		np.save((ROOT+'/RSA/%s_tfr_prob' %sub), trial_prob)
+		for t in np.arange(tfr.times.shape[0]):
+			y_data = tfr.metadata.cue.values.astype('str')
+			x_data = tfr_data[:,:,:,t]
+
+			if permutation:
+				for n_p in np.arange(num_permutations):
+					n_scores = run_classification(x_data, y_data, tfr_data, permutation = True)
+					trial_prob[:,t,:,n_p] = n_scores
+			elif not full_TFR:
+				n_scores = run_classification(x_data, y_data, tfr_data, permutation = False)
+				trial_prob[:,t,:] = n_scores
+			elif full_TFR:
+				for f in np.arange(tfr_data.shape[2]):
+					x_data = tfr_data[:,:,f,t]
+					n_scores = run_full_TFR_classification(x_data, y_data, cue_classes)
+					trial_prob[:,f,t,:] = n_scores
+
+		#saving posterior prob into numpy array
+		if permutation:
+			np.save((ROOT+'/RSA/%s_prob_permutation' %sub), trial_prob)
+		else:
+			np.save((ROOT+'/RSA/%s_tfr_prob' %sub), trial_prob)
+
+	#run_cue_prediction(tfr, permutation = False, full_TFR=True) #already done
+
+	#########################################################################################################
+	##### linear discrimination analysis on texture, feature (color and shape), and task dimensions
+	#########################################################################################################
+	def run_dim_prediction(tfr, permutation = False):
+		#cue_classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
+		tfr_data = tfr.data
+
+		if permutation:
+			num_permutations = 100
+			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],2,4,num_permutations))
+		# elif not full_TFR:
+		# 	trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],2)) #trial by time by labels (8)
+		else: #elif full_TFR:
+			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2], tfr_data.shape[3],2, 4)) #trial by freq by time by labels (8)
+
+		for t in np.arange(tfr.times.shape[0]):
+			#y_data = tfr.metadata.cue.values.astype('str')
+			contexts_y = tfr.metadata.Texture.values.astype('str')
+			colors_y = tfr.metadata.Color.values.astype('str')
+			shapes_y = tfr.metadata.Shape.values.astype('str')
+			tasks_y = tfr.metadata.Task.values.astype('str')
+			x_data = tfr_data[:,:,:,t]
+			y_data = [contexts_y, colors_y, shapes_y, tasks_y]
+
+			if permutation:
+				for y, y_data in enumerate([contexts_y, colors_y, shapes_y, tasks_y]):
+					for n_p in np.arange(num_permutations):
+						n_scores = run_classification(x_data, y_data, tfr_data, permutation = True)
+						trial_prob[:,t,:,y,n_p] = n_scores
+			else:
+				for y, y_data in enumerate([contexts_y, colors_y, shapes_y, tasks_y]):
+					for f in np.arange(tfr_data.shape[2]):
+						x_data = tfr_data[:,:,f,t]
+						n_scores = run_full_TFR_classification(x_data, y_data, np.unique(y_data))
+						trial_prob[:,f,t,:, y] = n_scores
+
+		#saving posterior prob into numpy array
+		if permutation:
+			np.save((ROOT+'/RSA/%s_prob_dim_permutation' %sub), trial_prob)
+		else:
+			np.save((ROOT+'/RSA/%s_tfr_dim_prob' %sub), trial_prob)
+	
+	run_dim_prediction(tfr, permutation = False)
 
 	now = datetime.now()
 	print("Done at:", now)
