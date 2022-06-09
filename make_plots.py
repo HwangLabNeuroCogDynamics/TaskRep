@@ -9,7 +9,7 @@ from scipy.ndimage.measurements import label
 from scipy import stats
 import mne
 from scipy.stats import t
-
+import pickle
 sns.set_context('talk', font_scale=1.1)
 #sns.set_style('white')
 sns.set_palette("colorblind")
@@ -20,6 +20,20 @@ included_subjects = ['128', '112', '108', '110', '120', '98', '86', '82', '115',
 ROOT = '/Shared/lss_kahwang_hpc/ThalHi_data/'
 data_path = '/Shared/lss_kahwang_hpc/ThalHi_data/RSA/'
 
+
+def save_object(obj, filename):
+	''' Simple function to write out objects into a pickle file
+	usage: save_object(obj, filename)
+	'''
+	with open(filename, 'wb') as output:
+		pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
+	#M = pickle.load(open(f, "rb"))
+
+
+def read_object(filename):
+	''' short hand for reading object because I can never remember pickle syntax'''
+	o = pickle.load(open(filename, "rb"))
+	return o
 
 
 def compile_RT_TFR_stats():
@@ -221,20 +235,60 @@ def calculate_TFR_classification_accuracy():
 		accu_mat = np.zeros((data.shape[1], data.shape[2]))
 		#calcuate accuracy
 		trials = data.shape[0]
-		for t in np.arange(data.shape[1]):
-			for f in np.arange(data.shape[2]):
-				n_scores = data[:,t,f,:]
+		for f in np.arange(data.shape[1]):
+			for t in np.arange(data.shape[2]):
+				n_scores = data[:,f,t,:]
 				i=0
 				for ix, ip in enumerate(np.argmax(n_scores,axis=1)):
 					if y_data[ix] == classes[ip]:
 						i=i+1
 
-				accu_mat[t,f] = (i/trials)*100
+				accu_mat[f,t] = (i/trials)*100
 		mat.append(accu_mat)
 
 	mean_acc = np.mean(mat,axis=0)
 	df = pd.DataFrame(data =mean_acc, index = np.round(tfr.freqs,2), columns = np.round(tfr.times,3))
 	return df, np.array(mat)
+
+def calculate_TFR_dim_accuracy():
+	ROOT = '/Shared/lss_kahwang_hpc/ThalHi_data/'
+	mat = []
+	for s, sub in enumerate(included_subjects):
+		tfr = mne.time_frequency.read_tfrs((ROOT+'RSA/%s_tfr.h5' %sub))[0]
+		#y_data = tfr.metadata.cue.values.astype('str')
+
+		data = np.load((ROOT+'/RSA/%s_tfr_dim_prob.npy' %sub)) # posterior probability
+		
+		contexts_y = tfr.metadata.Texture.values.astype('str')
+		colors_y = tfr.metadata.Color.values.astype('str')
+		shapes_y = tfr.metadata.Shape.values.astype('str')
+		tasks_y = tfr.metadata.Task.values.astype('str')
+
+		accu_mat = np.zeros((data.shape[1], data.shape[2], data.shape[4]))
+		#calcuate accuracy
+		trials = data.shape[0]
+
+		for y, y_data in enumerate([contexts_y, colors_y, shapes_y, tasks_y]):
+			for f in np.arange(data.shape[1]):
+				for t in np.arange(data.shape[2]):
+					n_scores = data[:,f,t,:,y]
+					i=0
+					for ix, ip in enumerate(np.argmax(n_scores,axis=1)):
+						if y_data[ix] == np.unique(y_data)[ip]:
+							i=i+1
+
+					accu_mat[f,t,y] = (i/trials)*100
+		mat.append(accu_mat)
+	
+	mat = np.array(mat)
+	dims = ['Texture', 'Color', 'Shape', 'Task']
+	mean_acc = {}
+	acc_df = {}
+	for y, dim in enumerate(dims):
+		mean_acc[dim] = np.mean(mat[:,:,:,y],axis=0)
+		acc_df[dim] = pd.DataFrame(data = np.mean(mat[:,:,:,y],axis=0), index = np.round(tfr.freqs,2), columns = np.round(tfr.times,3)) 
+	
+	return acc_df, mean_acc, mat
 
 
 if __name__ == "__main__":
@@ -255,6 +309,36 @@ if __name__ == "__main__":
 	fn = 'Figures/tfracu.png'
 	plt.savefig(fn)
 	plt.close()
+
+	# plot texture, color, shape, etc
+	dim_acc_df, dim_mean_acc, mat = calculate_TFR_dim_accuracy()
+	save_object("dim_acc_df", "Data/dim_acc_df")
+	save_object("dim_mean_acc", "Data/dim_mean_acc")
+	np.save("Data/accu_mat", mat)
+
+	dims = ['Texture', 'Color', 'Shape', 'Task']
+	for dim in dims:
+		ax = sns.heatmap(dim_acc_df[dim], xticklabels = 15, yticklabels = 3, vmin=52)
+		ax.invert_yaxis()
+		ax.set_xticks([31,82,134,185])
+		ax.set_xticklabels([-0.5, 0, 0.5, 1])
+		fn = 'Figures/%s_acc.png' %dim
+		plt.savefig(fn)
+		plt.close()
+
+	dim_df = pd.DataFrame()
+	for y, dim in enumerate(dims):
+		for s in np.arange(mat.shape[0]):
+			tmpdf = pd.DataFrame()
+			tmpdf['Accuracy'] = np.mean(mat[s, :, :, y], axis=0)
+			tmpdf['Variable'] = dim
+			tmpdf['Subject'] = s
+			tmpdf['Time'] = tfr.times
+			dim_df = dim_df.append(tmpdf)
+
+	fig = plt.figure()
+	ax = sns.lineplot(data=dim_df, x="Time", y="Accuracy", legend=False, hue='Variable', ci=None)
+	fig.savefig('Figures/dim_predcition_accuracy.png', dpi=600, bbox_inches='tight')	
 
 
 	########################################################################
