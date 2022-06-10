@@ -93,17 +93,10 @@ def run_classification(x_data, y_data, tfr_data, permutation = False):
 	n_scores[n_scores==np.inf]=36.8 #float of .9999999999xx
 	n_scores[n_scores==np.NINF]=-36.8 #float of -.9999999999xx
 
-	##calcuate accuracy
-	# i=0
-	# for ix, ip in enumerate(np.argmax(n_scores,axis=1)):
-	# 	if y_data[ix] == classes[ip]:
-	# 		i=i+1
-	# print("%0.2f accuracy for timepoint %0.2f" %(i/len(y_data)*100, tfr.times[t]))
-
 	return n_scores
 
 
-def run_full_TFR_classification(x_data, y_data, classes):
+def run_full_TFR_classification(x_data, y_data, classes, permutation = False):
 	''' clasification analysis with LDA, inputing one frequency at a time. Time-frequency prediction (Figure 3B)
 	Results then feed to RSA regression (Figure 4)
 	'''
@@ -115,23 +108,20 @@ def run_full_TFR_classification(x_data, y_data, classes):
 	for n in np.arange(10):
 		cv = KFold(n_splits=4, shuffle=True, random_state=6*n)
 
-		#No need to vectorize data. Feature space is trial by ch
-		#xp_data = zscore(np.reshape(x_data, (x_data.shape[0], x_data.shape[1])))
-		scores = cross_val_predict(lda, x_data, y_data, cv=cv, method='predict_proba', n_jobs = 1, pre_dispatch = 1) #logit the probability
-		n_scores[:,:,n] = scores
+		if permutation:
+			permuted_order = np.arange(x_data.shape[0])
+			np.random.shuffle(permuted_order)
+			xp_data = x_data[permuted_order,:] # permuate trial, first dim
+			scores = cross_val_predict(lda, xp_data, y_data, cv=cv, method='predict_proba', pre_dispatch = n_jobs) #logit the probability
+		else:
+			scores = cross_val_predict(lda, x_data, y_data, cv=cv, method='predict_proba', n_jobs = 1, pre_dispatch = 1) #logit the probability
+			n_scores[:,:,n] = scores
 
 	#logit transform prob.
 	n_scores = np.mean(n_scores,axis=2) # average acroos random CV runs
 	n_scores = logit(n_scores) #logit transform probability
 	n_scores[n_scores==np.inf]=36.8 #float of .9999999999xx
 	n_scores[n_scores==np.NINF]=-36.8 #float of -.9999999999xx
-
-	#calcuate accuracy
-	# i=0
-	# for ix, ip in enumerate(np.argmax(n_scores,axis=1)):
-	# 	if y_data[ix] == classes[ip]:
-	# 		i=i+1
-	# print("%0.2f accuracy for timepoint %0.2f at frequency %0.2f" %(i/len(y_data)*100, tfr.times[t], tfr.freqs[f]))
 
 	return n_scores
 
@@ -174,7 +164,7 @@ for sub in [included_subjects]:
 		tfr_data = tfr.data
 
 		if permutation:
-			num_permutations = 100
+			num_permutations = 1000
 			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],len(cue_classes),num_permutations))
 		elif not full_TFR:
 			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],len(cue_classes))) #trial by time by labels (8)
@@ -210,16 +200,16 @@ for sub in [included_subjects]:
 	##### linear discrimination analysis on texture, feature (color and shape), and task dimensions
 	#########################################################################################################
 	def run_dim_prediction(tfr, permutation = False):
-		#cue_classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
+
 		tfr_data = tfr.data
 
 		if permutation:
-			num_permutations = 100
-			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],2,4,num_permutations))
+			num_permutations = 1000
+			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2],tfr_data.shape[3],2, 4, num_permutations))
 		# elif not full_TFR:
 		# 	trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],2)) #trial by time by labels (8)
 		else: #elif full_TFR:
-			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2], tfr_data.shape[3],2, 4)) #trial by freq by time by labels (8)
+			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2],tfr_data.shape[3],2, 4)) #trial by freq by time by labels (8)
 
 		for t in np.arange(tfr.times.shape[0]):
 			#y_data = tfr.metadata.cue.values.astype('str')
@@ -227,18 +217,19 @@ for sub in [included_subjects]:
 			colors_y = tfr.metadata.Color.values.astype('str')
 			shapes_y = tfr.metadata.Shape.values.astype('str')
 			tasks_y = tfr.metadata.Task.values.astype('str')
-			x_data = tfr_data[:,:,:,t]
 			y_data = [contexts_y, colors_y, shapes_y, tasks_y]
 
 			if permutation:
 				for y, y_data in enumerate([contexts_y, colors_y, shapes_y, tasks_y]):
-					for n_p in np.arange(num_permutations):
-						n_scores = run_classification(x_data, y_data, tfr_data, permutation = True)
-						trial_prob[:,t,:,y,n_p] = n_scores
+					for f in np.arange(tfr_data.shape[2]):
+						for n_p in np.arange(num_permutations):
+							x_data = tfr_data[:,:,f,t]
+							n_scores = run_full_TFR_classification(x_data, y_data, np.unique(y_data), permutation = True)
+							trial_prob[:,f,t,:,y,n_p] = n_scores
 			else:
 				for y, y_data in enumerate([contexts_y, colors_y, shapes_y, tasks_y]):
 					for f in np.arange(tfr_data.shape[2]):
-						x_data = tfr_data[:,:,f,t]
+						
 						n_scores = run_full_TFR_classification(x_data, y_data, np.unique(y_data))
 						trial_prob[:,f,t,:, y] = n_scores
 
