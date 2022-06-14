@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import mne
 
-n_jobs = 4
+n_jobs = 2
 included_subjects = input()  #wait for input to determine which subject to run
 
 classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
@@ -101,24 +101,25 @@ def run_full_TFR_classification(x_data, y_data, classes, permutation = False):
 	Results then feed to RSA regression (Figure 4)
 	'''
 
-	# do this 10 times then average?
 	lda = LinearDiscriminantAnalysis(solver='lsqr',shrinkage='auto')
 
-	n_scores = np.zeros((y_data.shape[0],len(classes),10))
-	for n in np.arange(10):
-		cv = KFold(n_splits=4, shuffle=True, random_state=6*n)
-
-		if permutation:
-			permuted_order = np.arange(x_data.shape[0])
-			np.random.shuffle(permuted_order)
-			xp_data = x_data[permuted_order,:] # permuate trial, first dim
-			scores = cross_val_predict(lda, xp_data, y_data, cv=cv, method='predict_proba', pre_dispatch = n_jobs) #logit the probability
-		else:
+	if permutation:
+		cv = KFold(n_splits=4, shuffle=True, random_state=np.random.randint(9)+1)
+		n_scores = np.zeros((y_data.shape[0],len(classes)))
+		permuted_order = np.arange(x_data.shape[0])
+		np.random.shuffle(permuted_order)
+		xp_data = x_data[permuted_order,:] # permuate trial, first dim
+		scores = cross_val_predict(lda, xp_data, y_data, cv=cv, method='predict_proba', pre_dispatch = n_jobs)
+		n_scores[:,:] = scores
+	else:
+		# do this 10 times then average?
+		n_scores = np.zeros((y_data.shape[0],len(classes),10))
+		for n in np.arange(10):
+			cv = KFold(n_splits=4, shuffle=True, random_state=n*6)
 			scores = cross_val_predict(lda, x_data, y_data, cv=cv, method='predict_proba', n_jobs = 1, pre_dispatch = 1) #logit the probability
 			n_scores[:,:,n] = scores
+			n_scores = np.mean(n_scores,axis=2) # average acroos random CV runs
 
-	#logit transform prob.
-	n_scores = np.mean(n_scores,axis=2) # average acroos random CV runs
 	n_scores = logit(n_scores) #logit transform probability
 	n_scores[n_scores==np.inf]=36.8 #float of .9999999999xx
 	n_scores[n_scores==np.NINF]=-36.8 #float of -.9999999999xx
@@ -164,7 +165,7 @@ for sub in [included_subjects]:
 		tfr_data = tfr.data
 
 		if permutation:
-			num_permutations = 1000
+			num_permutations = 100
 			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],len(cue_classes),num_permutations))
 		elif not full_TFR:
 			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],len(cue_classes))) #trial by time by labels (8)
@@ -194,7 +195,7 @@ for sub in [included_subjects]:
 		else:
 			np.save((ROOT+'/RSA/%s_tfr_prob' %sub), trial_prob)
 
-	#run_cue_prediction(tfr, permutation = False, full_TFR=True) #already done
+	run_cue_prediction(tfr, permutation = False, full_TFR=True) #already done
 
 	#########################################################################################################
 	##### linear discrimination analysis on texture, feature (color and shape), and task dimensions
@@ -204,7 +205,7 @@ for sub in [included_subjects]:
 		tfr_data = tfr.data
 
 		if permutation:
-			num_permutations = 1000
+			num_permutations = 100
 			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2],tfr_data.shape[3],2, 4, num_permutations))
 		# elif not full_TFR:
 		# 	trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],2)) #trial by time by labels (8)
@@ -240,6 +241,7 @@ for sub in [included_subjects]:
 			np.save((ROOT+'/RSA/%s_tfr_dim_prob' %sub), trial_prob)
 	
 	run_dim_prediction(tfr, permutation = False)
+	run_dim_prediction(tfr, permutation = True)
 
 	now = datetime.now()
 	print("Done at:", now)
