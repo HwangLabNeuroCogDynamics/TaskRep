@@ -34,23 +34,30 @@ def mirror_evoke(ep):
 
 def run_TFR(sub):
 	''' run frequency decomp and save, sub by sub'''
-	this_sub_path=ROOT+ 'eeg_preproc/' +str(sub)
-	all_probe = {}
-	for condition in ['IDS', 'EDS', 'stay']:
-		all_probe[condition] =  mne.read_epochs(this_sub_path+'/probe_'+condition+'_events-epo.fif')
-	all_probe = mne.concatenate_epochs([all_probe['IDS'], all_probe['EDS'], all_probe['stay']]) # can use trial_n in metadata to rank data.
-	all_probe.baseline=None
+	
+	# thsese are old preproc version that the reviewer didn't like
+	# this_sub_path=ROOT+ 'eeg_preproc/' +str(sub)
+	# all_probe = {}
+	# for condition in ['IDS', 'EDS', 'stay']:
+	# 	all_probe[condition] =  mne.read_epochs(this_sub_path+'/probe_'+condition+'_events-epo.fif')
+	# all_probe = mne.concatenate_epochs([all_probe['IDS'], all_probe['EDS'], all_probe['stay']]) # can use trial_n in metadata to rank data.
+	# all_probe.baseline=None
 	#all_probe = all_probe.resample(128,'auto')
 	#all_probe.save(this_sub_path+'/all_epochs-epo.fif', overwrite=True)
-
+	
 	#merge meta data
-	for index, row in all_probe.metadata.iterrows():
-		try:
-			all_probe.metadata.loc[index, 'Rule_Switch'] = all_cue.metadata.loc[(all_cue.metadata.block==row.block) & (all_cue.metadata.trial_n==row.trial_n), 'Rule_Switch'].values[0]
-		except:
-			all_probe.metadata.loc[index, 'Rule_Switch'] = 'No_Switch'
-
-	all_probe.save(this_sub_path+'/all_probe_epochs-epo.fif', overwrite=True)
+	# for index, row in all_probe.metadata.iterrows():
+	# 	try:
+	# 		all_probe.metadata.loc[index, 'Rule_Switch'] = all_cue.metadata.loc[(all_cue.metadata.block==row.block) & (all_cue.metadata.trial_n==row.trial_n), 'Rule_Switch'].values[0]
+	# 	except:
+	# 		all_probe.metadata.loc[index, 'Rule_Switch'] = 'No_Switch'
+	
+	# this is the new preproc version requested by the reviewer
+	#eeg_preproc_RespToReviewers/103/
+	#eeg_preproc_RespToReviewers/103/probe events-epo.fif
+	this_sub_path=ROOT+ 'eeg_preproc_RespToReviewers/' +str(sub)
+	all_probe = mne.read_epochs(this_sub_path+'/probe events-epo.fif')
+	all_probe.baseline = None
 	all_probe.metadata.to_csv((ROOT+'RSA/%s_metadata.csv' %sub))
 
 	freqs = np.logspace(*np.log10([1, 40]), num=30)
@@ -116,9 +123,9 @@ def run_full_TFR_classification(x_data, y_data, classes, permutation = False):
 		n_scores = np.zeros((y_data.shape[0],len(classes),10))
 		for n in np.arange(10):
 			cv = KFold(n_splits=4, shuffle=True, random_state=n*6)
-			scores = cross_val_predict(lda, x_data, y_data, cv=cv, method='predict_proba', n_jobs = 1, pre_dispatch = 1) #logit the probability
+			scores = cross_val_predict(lda, x_data, y_data, cv=cv, method='predict_proba', n_jobs = 1, pre_dispatch = 1)
 			n_scores[:,:,n] = scores
-			n_scores = np.mean(n_scores,axis=2) # average acroos random CV runs
+		n_scores = np.mean(n_scores,axis=2) # average acroos random CV runs
 
 	n_scores = logit(n_scores) #logit transform probability
 	n_scores[n_scores==np.inf]=36.8 #float of .9999999999xx
@@ -140,8 +147,10 @@ for sub in [included_subjects]:
 	print(('running subject %s' %sub))
 	print('-------')
 
-	#run_TFR(sub) # uncomment if need to rerun
+	run_TFR(sub) # uncomment if need to rerun
 	tfr = mne.time_frequency.read_tfrs((ROOT+'RSA/%s_tfr.h5' %sub))[0]
+	now = datetime.now()
+	print("TFR done at ", now)
 
 	#average within bands? #(1-3 Hz for the delta-band, 4-7 Hz for the theta-band, 8-12 Hz for the alphaband, 13-30 Hz for the beta-band, 31-35 Hz for the gamma-band)
 	# delta = [1, 3]
@@ -195,7 +204,9 @@ for sub in [included_subjects]:
 		else:
 			np.save((ROOT+'/RSA/%s_tfr_prob' %sub), trial_prob)
 
-	run_cue_prediction(tfr, permutation = False, full_TFR=True) #already done
+	run_cue_prediction(tfr, permutation = False, full_TFR=True)
+	now = datetime.now()
+	print("Cue Prediction Done at:", now)
 
 	#########################################################################################################
 	##### linear discrimination analysis on texture, feature (color and shape), and task dimensions
@@ -231,7 +242,7 @@ for sub in [included_subjects]:
 				for y, y_data in enumerate([contexts_y, colors_y, shapes_y, tasks_y]):
 					for f in np.arange(tfr_data.shape[2]):
 						
-						n_scores = run_full_TFR_classification(x_data, y_data, np.unique(y_data))
+						n_scores = run_full_TFR_classification(x_data, y_data, np.unique(y_data), permutation = False)
 						trial_prob[:,f,t,:, y] = n_scores
 
 		#saving posterior prob into numpy array
@@ -241,10 +252,10 @@ for sub in [included_subjects]:
 			np.save((ROOT+'/RSA/%s_tfr_dim_prob' %sub), trial_prob)
 	
 	run_dim_prediction(tfr, permutation = False)
-	run_dim_prediction(tfr, permutation = True)
+	#run_dim_prediction(tfr, permutation = True)
 
 	now = datetime.now()
-	print("Done at:", now)
+	print("Dimension Prediction Done at:", now)
 
 
 
