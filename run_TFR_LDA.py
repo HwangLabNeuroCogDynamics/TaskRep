@@ -116,7 +116,7 @@ def run_full_TFR_classification(x_data, y_data, classes, permutation = False):
 		permuted_order = np.arange(x_data.shape[0])
 		np.random.shuffle(permuted_order)
 		xp_data = x_data[permuted_order,:] # permuate trial, first dim
-		scores = cross_val_predict(lda, xp_data, y_data, cv=cv, method='predict_proba', pre_dispatch = n_jobs)
+		scores = cross_val_predict(lda, xp_data, y_data, cv=cv, method='predict_proba', pre_dispatch = 1)
 		n_scores[:,:] = scores
 	else:
 		# do this 10 times then average?
@@ -174,7 +174,7 @@ for sub in [included_subjects]:
 		tfr_data = tfr.data
 
 		if permutation:
-			num_permutations = 100
+			num_permutations = 1000
 			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],len(cue_classes),num_permutations))
 		elif not full_TFR:
 			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],len(cue_classes))) #trial by time by labels (8)
@@ -216,7 +216,7 @@ for sub in [included_subjects]:
 		tfr_data = tfr.data
 
 		if permutation:
-			num_permutations = 100
+			num_permutations = 1000
 			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2],tfr_data.shape[3],2, 4, num_permutations))
 		# elif not full_TFR:
 		# 	trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],2)) #trial by time by labels (8)
@@ -251,11 +251,26 @@ for sub in [included_subjects]:
 		else:
 			np.save((ROOT+'/RSA/%s_tfr_dim_prob' %sub), trial_prob)
 	
+
 	run_dim_prediction(tfr, permutation = False)
 	#run_dim_prediction(tfr, permutation = True)
-
 	now = datetime.now()
 	print("Dimension Prediction Done at:", now)
+
+	DoPermute = False
+	if DoPermute:
+		## run permtuations
+		now = datetime.now()
+		print("Starting cue permutation at:", now)
+		run_cue_prediction(tfr, permutation = True, full_TFR=False)
+		now = datetime.now()
+		print("Permute Cue Prediction Done at:", now)
+		
+		now = datetime.now()
+		print("Starting dimension permutation at:", now)	
+		run_dim_prediction(tfr, permutation = True)
+		now = datetime.now()
+		print("Dimension permutation done at:", now)	
 
 
 
