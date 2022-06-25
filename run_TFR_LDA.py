@@ -241,7 +241,7 @@ for sub in [included_subjects]:
 			else:
 				for y, y_data in enumerate([contexts_y, colors_y, shapes_y, tasks_y]):
 					for f in np.arange(tfr_data.shape[2]):
-						
+						x_data = tfr_data[:,:,f,t]
 						n_scores = run_full_TFR_classification(x_data, y_data, np.unique(y_data), permutation = False)
 						trial_prob[:,f,t,:, y] = n_scores
 
@@ -265,7 +265,9 @@ for sub in [included_subjects]:
 		run_cue_prediction(tfr, permutation = True, full_TFR=False)
 		now = datetime.now()
 		print("Permute Cue Prediction Done at:", now)
-		
+
+	DoDimPermute = False
+	if DoDimPermute:		
 		now = datetime.now()
 		print("Starting dimension permutation at:", now)	
 		run_dim_prediction(tfr, permutation = True)
