@@ -70,7 +70,7 @@ def compile_subj_TFR_stats():
 			pdf['time'] = np.round(times[t],3) #convert from second to ms
 			pdf['frequency'] = np.round(np.load(data_path+'freqs.npy')[f],2)
 			df = pd.concat([df, pdf])
-			df.loc[pd.isna(df.Condition), 'Condition'] = 'All'
+			df['Condition'] = 'All'
 
 	df.to_csv((ROOT+'RSA/regression_results/RSA_TFR_GC_condition_compiled_results.csv'))
 	return df
@@ -291,6 +291,62 @@ def calculate_TFR_dim_accuracy():
 	return acc_df, mean_acc, mat
 
 
+def calculate_TFR_dim_perm_accuracy():
+	ROOT = '/Shared/lss_kahwang_hpc/ThalHi_data/'
+	mat = []
+	for s, sub in enumerate(included_subjects):
+		tfr = mne.time_frequency.read_tfrs((ROOT+'RSA/%s_tfr.h5' %sub))[0]
+		#y_data = tfr.metadata.cue.values.astype('str')
+
+		data = np.load((ROOT+'/RSA/%s_prob_dim_permutation.npy' %sub)) # posterior probability
+		
+		contexts_y = tfr.metadata.Texture.values.astype('str')
+		colors_y = tfr.metadata.Color.values.astype('str')
+		shapes_y = tfr.metadata.Shape.values.astype('str')
+		tasks_y = tfr.metadata.Task.values.astype('str')
+
+		if s ==0:
+			accu_mat = np.zeros((data.shape[1], data.shape[2], data.shape[4], data.shape[5]))
+			tmp_mat = np.zeros((data.shape[1], data.shape[2], data.shape[4], data.shape[5]))
+		else:
+			tmp_mat = np.zeros((data.shape[1], data.shape[2], data.shape[4], data.shape[5]))	
+		#calcuate accuracy
+		num_perm = data.shape[5]
+
+		for y, y_data in enumerate([contexts_y, colors_y, shapes_y, tasks_y]):
+			a=1*(y_data == np.unique(y_data)[0])
+
+			for f in np.arange(data.shape[1]):
+				for t in np.arange(data.shape[2]):
+					for n_p in np.arange(num_perm):
+						n_scores = data[:,f,t,:,y,n_p]
+						b = np.argmax(n_scores,axis=1)
+						
+						tmp_mat[f,t,y,n_p] = sum(a==b)/len(a) * 100
+						# i=0
+						# for ix, ip in enumerate(np.argmax(n_scores,axis=1)):
+						# 	if y_data[ix] == np.unique(y_data)[ip]:
+						# 		i=i+1
+
+						# accu_mat[f,t,y,n_p] = (i/trials)*100
+		if s >0:
+			accu_mat = np.concatenate((accu_mat, tmp_mat), axis=3)
+		else:
+			accu_mat = tmp_mat
+		
+		#mat.append(accu_mat)
+	
+	#mat = np.array(mat)
+	# dims = ['Texture', 'Color', 'Shape', 'Task']
+	# mean_acc = {}
+	# acc_df = {}
+	# for y, dim in enumerate(dims):
+	# 	mean_acc[dim] = np.mean(mat[:,:,:,y],axis=0)
+	#	acc_df[dim] = pd.DataFrame(data = np.mean(mat[:,:,:,y],axis=0), index = np.round(tfr.freqs,2), columns = np.round(tfr.times,3)) 
+	
+	return accu_mat
+
+
 if __name__ == "__main__":
 
 
@@ -311,11 +367,17 @@ if __name__ == "__main__":
 	plt.close()
 
 	# plot texture, color, shape, etc
+	# permutation results
+	#permuted_accumat = calculate_TFR_dim_perm_accuracy()
+	#np.save('Data/permuted_accumat', permuted_accumat)
+	permuted_accumat = np.load('Data/permuted_accumat.npy')
+
 	dim_acc_df, dim_mean_acc, mat = calculate_TFR_dim_accuracy()
-	save_object("dim_acc_df", "Data/dim_acc_df")
-	save_object("dim_mean_acc", "Data/dim_mean_acc")
+	save_object(dim_acc_df, "Data/dim_acc_df")
+	save_object(dim_mean_acc, "Data/dim_mean_acc")
 	np.save("Data/accu_mat", mat)
 
+	dim_acc_df = read_object("Data/dim_acc_df")
 	dims = ['Texture', 'Color', 'Shape', 'Task']
 	for dim in dims:
 		ax = sns.heatmap(dim_acc_df[dim], xticklabels = 15, yticklabels = 3, vmin=52)
@@ -326,6 +388,7 @@ if __name__ == "__main__":
 		plt.savefig(fn)
 		plt.close()
 
+	mat = np.load("Data/accu_mat.npy")
 	dim_df = pd.DataFrame()
 	for y, dim in enumerate(dims):
 		for s in np.arange(mat.shape[0]):
@@ -345,7 +408,7 @@ if __name__ == "__main__":
 	###### Plot RSA regression results and do cluster permutation. Figure 4
 	#############################################################################
 	##### compile TFR RSA sub by sub
-	#df = compile_subj_TFR_stats()
+	df = compile_subj_TFR_stats()
 	df = pd.read_csv(ROOT+'RSA/regression_results/RSA_TFR_GC_condition_compiled_results.csv')
 
 	for cond in ['task_b', 'context_b', 'feature_b', 'identity_b']:

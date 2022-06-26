@@ -128,16 +128,15 @@ def run_GCA(df, included_subjects, source, target, accuracy, condition='All', wi
 
 if __name__ == "__main__":
 
-    #df, cdf = compile_model_ts() #save time by saving to disk.
+    #df = compile_model_ts() #save time by saving to disk.
     included_subjects = input()
     data_path = '/Shared/lss_kahwang_hpc/ThalHi_data/RSA/'
     df = pd.read_csv((data_path+'regression_results/RSA_TFR_GC_compiled_results.csv'))
-    df = df.append(cdf)
 
     ### run through the models
     for condition in ['All']:
         for accu in ['Correct']:
-            for window in [50]:
+            for window in ['All']:
 
                 fn = data_path+'GC/%s_context-feature_%s_%s_%s_GC.csv' %(included_subjects, condition, accu, window)
                 if True: #not os.path.isfile(fn):
