@@ -9,7 +9,6 @@ import pandas as pd
 import numpy as np
 from scipy.stats import zscore
 import statsmodels.formula.api as smf
-import pathlib
 from datetime import datetime
 data_path = '/Shared/lss_kahwang_hpc/ThalHi_data/RSA/' #path specific to Iowa Argon system.
 
@@ -82,7 +81,7 @@ if __name__ == "__main__":
 
 	df = pd.read_csv((data_path+'model_regressors/RSA_t%s_f%s_data.csv' %(t, f)))
 	df = df.reset_index()
-	results_df, condition_results_df = run_regression(df)
+	results_df = run_regression(df)
 	results_df.to_csv((data_path+'regression_results/RSA_GC_t%s_f%s_results.csv' %(t, f)))
 
 
@@ -90,15 +89,15 @@ if __name__ == "__main__":
 	print("finished time: ", now)
 
 	#### test correlation among regressors
-	from statsmodels.stats.outliers_influence import variance_inflation_factor
-	mat = df[['context','identity','feature','task']]
-	# VIF dataframe
-	vif_data = pd.DataFrame()
-	vif_data["regressors"] = mat.columns
+	# from statsmodels.stats.outliers_influence import variance_inflation_factor
+	# mat = df[['context','identity','feature','task']]
+	# # VIF dataframe
+	# vif_data = pd.DataFrame()
+	# vif_data["regressors"] = mat.columns
 	
-	# calculating VIF for each feature
-	vif_data["regressors"] = [variance_inflation_factor(mat.values, i)
-							for i in range(len(mat.columns))]
+	# # calculating VIF for each feature
+	# vif_data["regressors"] = [variance_inflation_factor(mat.values, i)
+	# 						for i in range(len(mat.columns))]
 
 
 # end of line

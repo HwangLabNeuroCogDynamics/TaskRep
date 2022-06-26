@@ -4,13 +4,7 @@
 from gen_RSA import create_RSA_models
 import pandas as pd
 import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-from scipy.stats import zscore
-import statsmodels.formula.api as smf
-sns.set_context('paper', font_scale=1)
-sns.set_style('white')
-sns.set_palette("colorblind")
+
 
 included_subjects = ['128', '112', '108', '110', '120', '98', '86', '82', '115', '94', '76', '91', '80', '95', '121', '114', '125', '70',
 '107', '111', '88', '113', '131', '130', '135', '140', '167', '145', '146', '138', '147', '176', '122', '118', '103', '142']
@@ -65,7 +59,7 @@ def compile_fullTFR_RSA_model(t, time, f, freq):
 			tdf['Accuracy'] = metadata.loc[j, 'Accuracy']
 			tdf['rt'] = metadata.loc[j, 'rt'] #raw rt
 			tdf['Trial_type'] = metadata.loc[j, 'Trial_type']
-			tdf['Rule_Switch'] = metadata.loc[j, 'Rule_Switch']
+			#tdf['Rule_Switch'] = metadata.loc[j, 'Rule_Switch'] # not analyzed during revision
 			tdf['Trial_n'] = metadata.loc[j, 'trial_n']
 
 			trial_type = metadata.cue.values[j]
@@ -115,8 +109,8 @@ def gen_ftr_indices_for_looping():
 
 if __name__ == "__main__":
 
-	context_model, shape_model, color_model, identity_model, swapped_dimension_model, nonswapped_dimension_model, swapped_task_model, nonswapped_task_model, swapped_feature_model, nonswapped_feature_model = create_RSA_models()
-	for model in [context_model, shape_model, color_model, identity_model, swapped_dimension_model, nonswapped_dimension_model, swapped_task_model, nonswapped_task_model, swapped_feature_model, nonswapped_feature_model]:
+	context_model, shape_model, color_model, identity_model, swapped_dimension_model, nonswapped_dimension_model, swapped_task_model, nonswapped_task_model, swapped_feature_model, nonswapped_feature_model, alternative_model = create_RSA_models()
+	for model in [context_model, shape_model, color_model, identity_model, swapped_dimension_model, nonswapped_dimension_model, swapped_task_model, nonswapped_task_model, swapped_feature_model, nonswapped_feature_model, alternative_model]:
 		print(' ')
 		print(model)
 		print(' ')
