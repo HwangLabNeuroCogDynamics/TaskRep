@@ -76,7 +76,7 @@ if __name__ == "__main__":
 
 	cue_df = pd.DataFrame()
 	for t_ix in cue:
-		for f in delta_theta:
+		for f in delta:
 			cue_df = cue_df.append(pd.read_csv((data_path+'model_regressors/RSA_t%s_f%s_data.csv' %(t_ix, f))))
 	cue_df.to_csv(data_path+'singletrial_regression_results/RSA_GC_single_trial_cue_data.csv')
 
