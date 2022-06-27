@@ -7,7 +7,7 @@ RSA model creation in gen_TFR_RSA.py
 
 RSA regression in RSA_gc_regression.py
 
-SEM model in path_model.py and path_model.R
+SEM model in RSA_singletrial_regression.py and path_model.R
 
 various plotting functions in make_plots.py
 

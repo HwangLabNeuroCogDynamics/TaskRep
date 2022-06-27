@@ -5,7 +5,7 @@ library(lavaan)
 #####
 df <- read.csv('Data/singel_trial_RSA_betas.csv')
 model1 <- 'level: 1
-rt ~ c*probe_task_b + e*context_b
+rt ~ c*probe_task_b + e*identity_b
 probe_task_b ~ a*feature_b + b*identity_b
 feature_b ~ d*context_b
 identity_b ~ context_b + feature_b

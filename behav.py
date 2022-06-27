@@ -190,11 +190,11 @@ model = "TransitionRT ~ 0 + Identity + Task + Context + Feature + alternative"
 test_model3 = smf.ols(formula = model, data = rt_rsa_df).fit()  
 print(test_model3.summary())
 
-model = "TransitionRT ~ 0 + alternative"
+model = "TransitionRT ~ 1 + alternative"
 test_model4 = smf.ols(formula = model, data = rt_rsa_df).fit()  
 print(test_model4.summary())
 
-model = "TransitionRT ~ 0 + Task + alternative"
+model = "TransitionRT ~ 1 + Task + alternative"
 test_model4 = smf.ols(formula = model, data = rt_rsa_df).fit()  
 print(test_model4.summary())
 
