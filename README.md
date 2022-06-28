@@ -1,6 +1,8 @@
 # TaskRep
 Code and data for "Dynamics of Hierarchical Task Representations"
 
+for preprocessing see preprocess.py
+
 Time frequency transfomration and LDA decoding in run_TFR_LDA.py
 
 RSA model creation in gen_TFR_RSA.py
