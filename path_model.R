@@ -24,7 +24,7 @@ summary(model1, standardized = TRUE)
 fitMeasures(model1)
 
 model2 <- 'level: 1
-rt ~ probe_task_b
+rt ~ probe_task_b + identity_b
 probe_task_b ~ identity_b
 feature_b ~~ feature_b
 context_b ~~ context_b
