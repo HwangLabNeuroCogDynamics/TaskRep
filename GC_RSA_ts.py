@@ -27,10 +27,10 @@ def compile_model_ts():
             pdf['frequency'] = np.round(np.load(data_path+'freqs.npy')[f],2)
             pdf['Condition'] = 'All'
             df = pd.concat([df, pdf])
-            pdf = pd.read_csv((data_path+'regression_results/RSA_GC_condition_t%s_f%s_results.csv' %(t, f)))
-            pdf['time'] = times[t]
-            pdf['frequency'] = np.round(np.load(data_path+'freqs.npy')[f],2)
-            cdf = pd.concat([cdf, pdf])
+            # pdf = pd.read_csv((data_path+'regression_results/RSA_GC_condition_t%s_f%s_results.csv' %(t, f)))
+            # pdf['time'] = times[t]
+            # pdf['frequency'] = np.round(np.load(data_path+'freqs.npy')[f],2)
+            # cdf = pd.concat([cdf, pdf])
     df.to_csv((data_path+'regression_results/RSA_TFR_GC_compiled_results.csv'))
 
     return df

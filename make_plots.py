@@ -353,15 +353,16 @@ if __name__ == "__main__":
 	########################################################################
 	###### plot raw classification accuracy of individual cues. Figure 3
 	##############################################################################
-	#acc_df, _ = calculate_TFR_classification_accuracy()
+	#acc_df, mat = calculate_TFR_classification_accuracy()
 	#acc_df.to_csv('Data/TFR_Accu.csv')
 	acc_df = pd.read_csv('Data/TFR_Accu.csv')
 	times = np.load(data_path+'times.npy')  #we want 31, 82, 134, 185. Which is -0.5, 0, 0.5, 1
 	#freqs = np.round(np.load(data_path+'freqs.npy')[f],2)  
-	ax = sns.heatmap(acc_df, xticklabels = 15, yticklabels = 3, vmin=12, vmax=16)
+	ax = sns.heatmap(acc_df, xticklabels = 15, yticklabels = 3, vmin=13.5, vmax=15, mask = acc_df<13.5)
 	ax.invert_yaxis()
 	ax.set_xticks([31,82,134,185])
-	ax.set_xticklabels([-0.5, 0, 0.5, 1])
+	ax.set_xticklabels([-0.5, 0, 0.5, 1], rotation = 0)
+	plt.tight_layout()
 	fn = 'Figures/tfracu.png'
 	plt.savefig(fn)
 	plt.close()
@@ -372,19 +373,20 @@ if __name__ == "__main__":
 	#np.save('Data/permuted_accumat', permuted_accumat)
 	permuted_accumat = np.load('Data/permuted_accumat.npy')
 
-	dim_acc_df, dim_mean_acc, mat = calculate_TFR_dim_accuracy()
-	save_object(dim_acc_df, "Data/dim_acc_df")
-	save_object(dim_mean_acc, "Data/dim_mean_acc")
-	np.save("Data/accu_mat", mat)
+	#dim_acc_df, dim_mean_acc, mat = calculate_TFR_dim_accuracy()
+	#save_object(dim_acc_df, "Data/dim_acc_df")
+	#save_object(dim_mean_acc, "Data/dim_mean_acc")
+	#np.save("Data/accu_mat", mat)
 
 	dim_acc_df = read_object("Data/dim_acc_df")
 	dims = ['Texture', 'Color', 'Shape', 'Task']
 	for dim in dims:
-		ax = sns.heatmap(dim_acc_df[dim], xticklabels = 15, yticklabels = 3, vmin=52)
+		ax = sns.heatmap(dim_acc_df[dim], xticklabels = 15, yticklabels = 3, vmin=52, vmax=55, mask = dim_acc_df[dim]<52.2)
 		ax.invert_yaxis()
 		ax.set_xticks([31,82,134,185])
-		ax.set_xticklabels([-0.5, 0, 0.5, 1])
-		fn = 'Figures/%s_acc.png' %dim
+		ax.set_xticklabels([-0.5, 0, 0.5, 1], rotation = 0)
+		plt.tight_layout()
+		fn = 'Figures/acc_%s.png' %dim
 		plt.savefig(fn)
 		plt.close()
 
@@ -408,7 +410,7 @@ if __name__ == "__main__":
 	###### Plot RSA regression results and do cluster permutation. Figure 4
 	#############################################################################
 	##### compile TFR RSA sub by sub
-	df = compile_subj_TFR_stats()
+	#df = compile_subj_TFR_stats()
 	df = pd.read_csv(ROOT+'RSA/regression_results/RSA_TFR_GC_condition_compiled_results.csv')
 
 	for cond in ['task_b', 'context_b', 'feature_b', 'identity_b']:
@@ -454,7 +456,7 @@ if __name__ == "__main__":
 	def plot_f2f_GC(source, target):
 		D1 = compile_GC_matrices(source, target, 'Correct', 'All', 'All', 'F')
 		D2 = compile_GC_matrices(source, target, 'Correct', 'All', 'All', 'reverseF')    
-		mask, A = matrix_permutation(D1, D2, 2.03, 0.05, False)
+		mask, A = matrix_permutation(D1, D2, 2.03, 0.05, True)
 		freqs = np.round(np.load('/Shared/lss_kahwang_hpc/ThalHi_data/RSA/freqs.npy'),2)
 		df = pd.DataFrame(data =A.T, index = freqs, columns =freqs)
 		ax = sns.heatmap(df, center = 0, vmin =-4, vmax=4, xticklabels = 6, yticklabels = 4, square=True, mask = 1- mask.T)
