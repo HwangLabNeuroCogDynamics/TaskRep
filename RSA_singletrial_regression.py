@@ -71,18 +71,19 @@ if __name__ == "__main__":
 	#define power and time epochs
 	delta_theta = np.where((8>=freqs) & (freqs>=4))[0][0:-1:3]
 	delta = np.where((4>=freqs) & (freqs>=1))[0][0:-1:3]
+	All = np.where((40>=freqs) & (freqs>=1))[0][0:-1:3]
 	cue = np.where((-0.5 <= times) & (times <=0))[0][0:-1:3]
 	resp = np.where((0.0 <= times) & (times <=0.5))[0][0:-1:3]
 
 	cue_df = pd.DataFrame()
 	for t_ix in cue:
-		for f in delta:
+		for f in All:
 			cue_df = cue_df.append(pd.read_csv((data_path+'model_regressors/RSA_t%s_f%s_data.csv' %(t_ix, f))))
 	cue_df.to_csv(data_path+'singletrial_regression_results/RSA_GC_single_trial_cue_data.csv')
 
 	probe_df = pd.DataFrame()
 	for t_ix in resp:
-		for f in delta:
+		for f in All:
 			probe_df = probe_df.append(pd.read_csv((data_path+'model_regressors/RSA_t%s_f%s_data.csv' %(t_ix, f))))
 	probe_df.to_csv(data_path+'singletrial_regression_results/RSA_GC_single_trial_probe_data.csv')
 

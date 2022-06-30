@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import mne
 
-n_jobs = 2
+n_jobs = 1
 included_subjects = input()  #wait for input to determine which subject to run
 
 classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
@@ -70,6 +70,8 @@ def run_TFR(sub):
 	np.save((ROOT+'RSA/%s_times' %sub), tfr.times)
 	tfr.save((ROOT+'RSA/%s_tfr.h5' %sub), overwrite=True)
 
+	return tfr
+
 
 def run_classification(x_data, y_data, tfr_data, permutation = False):
 	''' clasification analysis with LDA, using all freqs as features, so this is temporal prediction analysis (Fig 3A)'''
@@ -116,7 +118,7 @@ def run_full_TFR_classification(x_data, y_data, classes, permutation = False):
 		permuted_order = np.arange(x_data.shape[0])
 		np.random.shuffle(permuted_order)
 		xp_data = x_data[permuted_order,:] # permuate trial, first dim
-		scores = cross_val_predict(lda, xp_data, y_data, cv=cv, method='predict_proba', pre_dispatch = 1)
+		scores = cross_val_predict(lda, xp_data, y_data, cv=cv, method='predict_proba', n_jobs = 1, pre_dispatch = 1)
 		n_scores[:,:] = scores
 	else:
 		# do this 10 times then average?
@@ -134,6 +136,86 @@ def run_full_TFR_classification(x_data, y_data, classes, permutation = False):
 	return n_scores
 
 
+def run_cue_prediction(tfr, permutation = False, full_TFR=True):
+	#permutation = False # run permutation?
+	#full_TFR = True # run full TFR prediction (each TFR bin per prediction model)
+	cue_classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
+	tfr_data = tfr.data
+
+	if permutation:
+		num_permutations = 1000
+		trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],len(cue_classes),num_permutations))
+	elif not full_TFR:
+		trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],len(cue_classes))) #trial by time by labels (8)
+	elif full_TFR:
+		trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2], tfr_data.shape[3],len(cue_classes))) #trial by freq by time by labels (8)
+
+	for t in np.arange(tfr.times.shape[0]):
+		y_data = tfr.metadata.cue.values.astype('str')
+		x_data = tfr_data[:,:,:,t]
+
+		if permutation:
+			for n_p in np.arange(num_permutations):
+				n_scores = run_classification(x_data, y_data, tfr_data, permutation = True)
+				trial_prob[:,t,:,n_p] = n_scores
+		elif not full_TFR:
+			n_scores = run_classification(x_data, y_data, tfr_data, permutation = False)
+			trial_prob[:,t,:] = n_scores
+		elif full_TFR:
+			for f in np.arange(tfr_data.shape[2]):
+				x_data = tfr_data[:,:,f,t]
+				n_scores = run_full_TFR_classification(x_data, y_data, cue_classes)
+				trial_prob[:,f,t,:] = n_scores
+
+	#saving posterior prob into numpy array
+	if permutation:
+		np.save((ROOT+'/RSA/%s_prob_permutation' %sub), trial_prob)
+	else:
+		np.save((ROOT+'/RSA/%s_tfr_prob' %sub), trial_prob)
+
+
+def run_dim_prediction(tfr, permutation = False):
+
+	tfr_data = tfr.data
+
+	if permutation:
+		num_permutations = 1000
+		trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2],tfr_data.shape[3],2, 4, num_permutations))
+	# elif not full_TFR:
+	# 	trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],2)) #trial by time by labels (8)
+	else: #elif full_TFR:
+		trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2],tfr_data.shape[3],2, 4)) #trial by freq by time by labels (8)
+
+	for t in np.arange(tfr.times.shape[0]):
+		#y_data = tfr.metadata.cue.values.astype('str')
+		contexts_y = tfr.metadata.Texture.values.astype('str')
+		colors_y = tfr.metadata.Color.values.astype('str')
+		shapes_y = tfr.metadata.Shape.values.astype('str')
+		tasks_y = tfr.metadata.Task.values.astype('str')
+		y_data = [contexts_y, colors_y, shapes_y, tasks_y]
+
+		if permutation:
+			for y, y_data in enumerate([contexts_y, colors_y, shapes_y, tasks_y]):
+				for f in np.arange(tfr_data.shape[2]):
+					for n_p in np.arange(num_permutations):
+						x_data = tfr_data[:,:,f,t]
+						n_scores = run_full_TFR_classification(x_data, y_data, np.unique(y_data), permutation = True)
+						trial_prob[:,f,t,:,y,n_p] = n_scores
+		else:
+			for y, y_data in enumerate([contexts_y, colors_y, shapes_y, tasks_y]):
+				for f in np.arange(tfr_data.shape[2]):
+					x_data = tfr_data[:,:,f,t]
+					n_scores = run_full_TFR_classification(x_data, y_data, np.unique(y_data), permutation = False)
+					trial_prob[:,f,t,:, y] = n_scores
+
+	#saving posterior prob into numpy array
+	if permutation:
+		np.save((ROOT+'/RSA/%s_prob_dim_permutation' %sub), trial_prob)
+	else:
+		np.save((ROOT+'/RSA/%s_tfr_dim_prob' %sub), trial_prob)
+	
+
+
 for sub in [included_subjects]:
 
 	# datetime object containing current date and time
@@ -147,132 +229,42 @@ for sub in [included_subjects]:
 	print(('running subject %s' %sub))
 	print('-------')
 
-	run_TFR(sub) # uncomment if need to rerun
-	tfr = mne.time_frequency.read_tfrs((ROOT+'RSA/%s_tfr.h5' %sub))[0]
+	tfr = run_TFR(sub) # uncomment if need to rerun
+	#tfr = mne.time_frequency.read_tfrs((ROOT+'RSA/%s_tfr.h5' %sub))[0]
 	now = datetime.now()
 	print("TFR done at ", now)
-
-	#average within bands? #(1-3 Hz for the delta-band, 4-7 Hz for the theta-band, 8-12 Hz for the alphaband, 13-30 Hz for the beta-band, 31-35 Hz for the gamma-band)
-	# delta = [1, 3]
-	# theta = [4, 7]
-	# alpha = [8, 12]
-	# beta = [13, 30]
-	# gamma = [30, 35]
-	# bands = [delta,theta,alpha,beta,gamma]
-	# tfr_data = np.zeros((tfr.data.shape[0], tfr.data.shape[1], 5, tfr.data.shape[3]))
-	# for i, band in enumerate(bands):
-	# 	tfr_data[:,:,i,:] = np.mean(tfr.data[:,:, (freqs>=band[0]) & (freqs<=band[1]), ], axis=2)
-	
 
 	#########################################################################################################
 	##### linear discrimination analysis on individual cues
 	#########################################################################################################
-	def run_cue_prediction(tfr, permutation = False, full_TFR=True):
-		#permutation = False # run permutation?
-		#full_TFR = True # run full TFR prediction (each TFR bin per prediction model)
-		cue_classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
-		tfr_data = tfr.data
-
-		if permutation:
-			num_permutations = 1000
-			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],len(cue_classes),num_permutations))
-		elif not full_TFR:
-			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],len(cue_classes))) #trial by time by labels (8)
-		elif full_TFR:
-			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2], tfr_data.shape[3],len(cue_classes))) #trial by freq by time by labels (8)
-
-		for t in np.arange(tfr.times.shape[0]):
-			y_data = tfr.metadata.cue.values.astype('str')
-			x_data = tfr_data[:,:,:,t]
-
-			if permutation:
-				for n_p in np.arange(num_permutations):
-					n_scores = run_classification(x_data, y_data, tfr_data, permutation = True)
-					trial_prob[:,t,:,n_p] = n_scores
-			elif not full_TFR:
-				n_scores = run_classification(x_data, y_data, tfr_data, permutation = False)
-				trial_prob[:,t,:] = n_scores
-			elif full_TFR:
-				for f in np.arange(tfr_data.shape[2]):
-					x_data = tfr_data[:,:,f,t]
-					n_scores = run_full_TFR_classification(x_data, y_data, cue_classes)
-					trial_prob[:,f,t,:] = n_scores
-
-		#saving posterior prob into numpy array
-		if permutation:
-			np.save((ROOT+'/RSA/%s_prob_permutation' %sub), trial_prob)
-		else:
-			np.save((ROOT+'/RSA/%s_tfr_prob' %sub), trial_prob)
-
-	run_cue_prediction(tfr, permutation = False, full_TFR=True)
-	now = datetime.now()
-	print("Cue Prediction Done at:", now)
+	#run_cue_prediction(tfr, permutation = False, full_TFR=True)
+	# now = datetime.now()
+	# print("Cue Prediction Done at:", now)
 
 	#########################################################################################################
 	##### linear discrimination analysis on texture, feature (color and shape), and task dimensions
 	#########################################################################################################
-	def run_dim_prediction(tfr, permutation = False):
-
-		tfr_data = tfr.data
-
-		if permutation:
-			num_permutations = 1000
-			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2],tfr_data.shape[3],2, 4, num_permutations))
-		# elif not full_TFR:
-		# 	trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[3],2)) #trial by time by labels (8)
-		else: #elif full_TFR:
-			trial_prob = np.zeros((tfr_data.shape[0],tfr_data.shape[2],tfr_data.shape[3],2, 4)) #trial by freq by time by labels (8)
-
-		for t in np.arange(tfr.times.shape[0]):
-			#y_data = tfr.metadata.cue.values.astype('str')
-			contexts_y = tfr.metadata.Texture.values.astype('str')
-			colors_y = tfr.metadata.Color.values.astype('str')
-			shapes_y = tfr.metadata.Shape.values.astype('str')
-			tasks_y = tfr.metadata.Task.values.astype('str')
-			y_data = [contexts_y, colors_y, shapes_y, tasks_y]
-
-			if permutation:
-				for y, y_data in enumerate([contexts_y, colors_y, shapes_y, tasks_y]):
-					for f in np.arange(tfr_data.shape[2]):
-						for n_p in np.arange(num_permutations):
-							x_data = tfr_data[:,:,f,t]
-							n_scores = run_full_TFR_classification(x_data, y_data, np.unique(y_data), permutation = True)
-							trial_prob[:,f,t,:,y,n_p] = n_scores
-			else:
-				for y, y_data in enumerate([contexts_y, colors_y, shapes_y, tasks_y]):
-					for f in np.arange(tfr_data.shape[2]):
-						x_data = tfr_data[:,:,f,t]
-						n_scores = run_full_TFR_classification(x_data, y_data, np.unique(y_data), permutation = False)
-						trial_prob[:,f,t,:, y] = n_scores
-
-		#saving posterior prob into numpy array
-		if permutation:
-			np.save((ROOT+'/RSA/%s_prob_dim_permutation' %sub), trial_prob)
-		else:
-			np.save((ROOT+'/RSA/%s_tfr_dim_prob' %sub), trial_prob)
-	
-
-	run_dim_prediction(tfr, permutation = False)
+	#run_dim_prediction(tfr, permutation = False)
 	#run_dim_prediction(tfr, permutation = True)
-	now = datetime.now()
-	print("Dimension Prediction Done at:", now)
+	# now = datetime.now()
+	# print("Dimension Prediction Done at:", now)
 
-	DoPermute = False
-	if DoPermute:
-		## run permtuations
-		now = datetime.now()
-		print("Starting cue permutation at:", now)
-		run_cue_prediction(tfr, permutation = True, full_TFR=False)
-		now = datetime.now()
-		print("Permute Cue Prediction Done at:", now)
+	# DoPermute = False
+	# if DoPermute:
+	# 	## run permtuations
+	# 	now = datetime.now()
+	# 	print("Starting cue permutation at:", now)
+	# 	run_cue_prediction(tfr, permutation = True, full_TFR=False)
+	# 	now = datetime.now()
+	# 	print("Permute Cue Prediction Done at:", now)
 
-	DoDimPermute = False
-	if DoDimPermute:		
-		now = datetime.now()
-		print("Starting dimension permutation at:", now)	
-		run_dim_prediction(tfr, permutation = True)
-		now = datetime.now()
-		print("Dimension permutation done at:", now)	
+	# DoDimPermute = True
+	# if DoDimPermute:		
+	# now = datetime.now()
+	# print("Starting dimension permutation at:", now)	
+	# run_dim_prediction(tfr, permutation = True)
+	# now = datetime.now()
+	# print("Dimension permutation done at:", now)	
 
 
 
