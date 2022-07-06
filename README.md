@@ -1,7 +1,7 @@
 # TaskRep
 Code and data for "Dynamics of Hierarchical Task Representations"
 
-for preprocessing see preprocess.py
+For preprocessing see preprocess.py
 
 Time frequency transfomration and LDA decoding in run_TFR_LDA.py
 
@@ -13,5 +13,6 @@ SEM model in RSA_singletrial_regression.py and path_model.R
 
 various plotting functions in make_plots.py
 
+Raw data will be made available on OSF after acceptance. 
 
 
