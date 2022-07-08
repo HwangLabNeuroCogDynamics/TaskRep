@@ -381,7 +381,7 @@ if __name__ == "__main__":
 	dim_acc_df = read_object("Data/dim_acc_df")
 	dims = ['Texture', 'Color', 'Shape', 'Task']
 	for dim in dims:
-		ax = sns.heatmap(dim_acc_df[dim], xticklabels = 15, yticklabels = 3, vmin=52, vmax=55, mask = dim_acc_df[dim]<52.2)
+		ax = sns.heatmap(dim_acc_df[dim], xticklabels = 15, yticklabels = 3, vmin=52, vmax=55, mask = dim_acc_df[dim]<51.85)
 		ax.invert_yaxis()
 		ax.set_xticks([31,82,134,185])
 		ax.set_xticklabels([-0.5, 0, 0.5, 1], rotation = 0)
@@ -404,6 +404,16 @@ if __name__ == "__main__":
 	fig = plt.figure()
 	ax = sns.lineplot(data=dim_df, x="Time", y="Accuracy", legend=False, hue='Variable', ci=None)
 	fig.savefig('Figures/dim_predcition_accuracy.png', dpi=600, bbox_inches='tight')	
+
+	dim_mean_acc = read_object("Data/dim_mean_acc")
+	mat = np.load('Data/accu_mat.npy')
+	times = np.load(data_path+'times.npy')
+	freqs = np.load(data_path+'freqs.npy')
+
+	# X = mat[:,np.where((1 <= freqs) & (freqs <=40))[0], :, 0][:,:,np.where((-0.5 <= times) & (times <=0))[0]].mean(axis=(0,2))
+	# Y = mat[:,np.where((1 <= freqs) & (freqs <=40))[0], :, 3][:,:,np.where((-0.5 <= times) & (times <=0))[0]].mean(axis=(0,2))
+	# from scipy import stats
+	# stats.ttest_rel(X,Y)
 
 
 	########################################################################
