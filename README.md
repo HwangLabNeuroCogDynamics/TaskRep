@@ -13,6 +13,5 @@ SEM model in RSA_singletrial_regression.py and path_model.R
 
 various plotting functions in make_plots.py
 
-Raw data will be made available on OSF after acceptance. 
-
+Raw data are now at https://www.dropbox.com/s/a13lvpbk3n9sk82/MNE_BIDS_raw_format.tar.gz?dl=0 
 
