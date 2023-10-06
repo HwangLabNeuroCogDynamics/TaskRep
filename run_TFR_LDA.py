@@ -1,21 +1,22 @@
-####################################################################
-# Script to run time frequency decomp then linear discrimnation analysis
-####################################################################
-from sklearn.model_selection import train_test_split, ShuffleSplit, cross_val_score, cross_val_predict, KFold
-from scipy.stats import zscore
-from scipy.special import logit
-from mne.time_frequency import tfr_morlet
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from datetime import datetime
-import numpy as np
-import pandas as pd
-import mne
+	####################################################################
+	# Script to run time frequency decomp then linear discrimnation analysis
+	####################################################################
+	from sklearn.model_selection import train_test_split, ShuffleSplit, cross_val_score, cross_val_predict, KFold
+	from sklearn.model_selection import LeaveOneOut
+	from scipy.stats import zscore
+	from scipy.special import logit
+	from mne.time_frequency import tfr_morlet
+	from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+	from datetime import datetime
+	import numpy as np
+	import pandas as pd
+	import mne
 
-n_jobs = 1
-included_subjects = input()  #wait for input to determine which subject to run
+	n_jobs = 4
+	included_subjects = input()  #wait for input to determine which subject to run
 
-classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
-ROOT = '/Shared/lss_kahwang_hpc/ThalHi_data/'
+	classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
+	ROOT = '/Shared/lss_kahwang_hpc/ThalHi_data/'
 
 # included_subjects = ['128', '112', '108', '110', '120', '98', '86', '82', '115', '94', '76', '91', '80', '95', '121', '114', '125', '70',
 # '107', '111', '88', '113', '131', '130', '135', '140', '167', '145', '146', '138', '147', '176', '122', '118', '103', '142']
@@ -215,6 +216,29 @@ def run_dim_prediction(tfr, permutation = False):
 		np.save((ROOT+'/RSA/%s_tfr_dim_prob' %sub), trial_prob)
 	
 
+def run_evoke_dim_prediction(sub):
+
+	#load evoke
+	all_probe = mne.read_epochs('/Shared/lss_kahwang_hpc/ThalHi_data/preproc_EEG/sub-%s_task-ThalHi_probe_eeg-epo.fif' %sub)
+
+	trial_prob = np.zeros((all_probe.get_data().shape[0], all_probe.get_data().shape[2],4)) #trial by time by labels (8)
+	contexts_y = all_probe.metadata.Texture.values.astype('str')
+	colors_y = all_probe.metadata.Color.values.astype('str')
+	shapes_y = all_probe.metadata.Shape.values.astype('str')
+	tasks_y = all_probe.metadata.Task.values.astype('str')
+	for t in np.arange(all_probe.times.shape[0]):
+		x_data = all_probe.get_data()[:,0:64,t]
+		for y, y_data in enumerate([contexts_y, colors_y, shapes_y, tasks_y]):
+			lda = LinearDiscriminantAnalysis(solver='lsqr',shrinkage='auto')		
+			#for n in np.arange(10):
+			#cv = KFold(n_splits=4, shuffle=True, random_state=n*6)
+			scores = cross_val_score(lda, x_data, y_data, cv=LeaveOneOut(), n_jobs = 4, pre_dispatch = 1)
+			trial_prob[:,t, y] = scores # average acroos trials
+
+	#saving posterior prob into numpy array
+	#some kind of accuracy calculation
+	np.save((ROOT+'/RSA/%s_evoke_dim_prob' %sub), trial_prob)
+	
 
 for sub in [included_subjects]:
 
@@ -225,14 +249,21 @@ for sub in [included_subjects]:
 	# dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
 	# print("date and time =", dt_string)
 
-	print('-------')
-	print(('running subject %s' %sub))
-	print('-------')
+	# print('-------')
+	# print(('running subject %s' %sub))
+	# print('-------')
 
-	tfr = run_TFR(sub) # uncomment if need to rerun
-	#tfr = mne.time_frequency.read_tfrs((ROOT+'RSA/%s_tfr.h5' %sub))[0]
+	# #tfr = run_TFR(sub) # uncomment if need to rerun
+	# #tfr = mne.time_frequency.read_tfrs((ROOT+'RSA/%s_tfr.h5' %sub))[0]
+	# now = datetime.now()
+	# print("TFR done at ", now)
+
+	#########################################################################################################
+	##### linear discrimination analysis on individual features from evoke data
+	#########################################################################################################
+	run_evoke_dim_prediction(sub)
 	now = datetime.now()
-	print("TFR done at ", now)
+	print("feature prediction done at:", now)
 
 	#########################################################################################################
 	##### linear discrimination analysis on individual cues
