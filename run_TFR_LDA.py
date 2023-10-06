@@ -1,22 +1,22 @@
-	####################################################################
-	# Script to run time frequency decomp then linear discrimnation analysis
-	####################################################################
-	from sklearn.model_selection import train_test_split, ShuffleSplit, cross_val_score, cross_val_predict, KFold
-	from sklearn.model_selection import LeaveOneOut
-	from scipy.stats import zscore
-	from scipy.special import logit
-	from mne.time_frequency import tfr_morlet
-	from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-	from datetime import datetime
-	import numpy as np
-	import pandas as pd
-	import mne
+####################################################################
+# Script to run time frequency decomp then linear discrimnation analysis
+####################################################################
+from sklearn.model_selection import train_test_split, ShuffleSplit, cross_val_score, cross_val_predict, KFold
+from sklearn.model_selection import LeaveOneOut
+from scipy.stats import zscore
+from scipy.special import logit
+from mne.time_frequency import tfr_morlet
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from datetime import datetime
+import numpy as np
+import pandas as pd
+import mne
 
-	n_jobs = 4
-	included_subjects = input()  #wait for input to determine which subject to run
+n_jobs = 4
+included_subjects = input()  #wait for input to determine which subject to run
 
-	classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
-	ROOT = '/Shared/lss_kahwang_hpc/ThalHi_data/'
+classes = ['dcb', 'dcr', 'dpb', 'dpr', 'fcb', 'fcr', 'fpb', 'fpr']
+ROOT = '/Shared/lss_kahwang_hpc/ThalHi_data/'
 
 # included_subjects = ['128', '112', '108', '110', '120', '98', '86', '82', '115', '94', '76', '91', '80', '95', '121', '114', '125', '70',
 # '107', '111', '88', '113', '131', '130', '135', '140', '167', '145', '146', '138', '147', '176', '122', '118', '103', '142']
