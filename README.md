@@ -13,5 +13,5 @@ SEM model in RSA_singletrial_regression.py and path_model.R
 
 Various plotting functions in make_plots.py
 
-
+Data availabel at 10.5281/zenodo.17409783  (https://zenodo.org/records/17409783)
 
