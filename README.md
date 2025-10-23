@@ -1,5 +1,10 @@
 # TaskRep
-Code and data for "Dynamics of Hierarchical Task Representations"
+Code and data for Dynamics of Hierarchical Task Representations.
+
+Dillan Cellier, Isaac T. Petersen, Kai Hwang
+
+Journal of Neuroscience 21 September 2022, 42 (38) 7276-7284; DOI: 10.1523/JNEUROSCI.0233-22.2022
+
 
 For preprocessing see preprocess.py
 
